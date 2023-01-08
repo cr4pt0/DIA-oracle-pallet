@@ -1653,6 +1653,7 @@ version = "0.1.0"
 dependencies = [
  "dia-oracle-runtime-api",
  "jsonrpsee",
+ "pallet-timestamp",
  "sp-api",
  "sp-blockchain",
  "sp-core",
@@ -1665,6 +1666,7 @@ version = "0.1.0"
 dependencies = [
  "dia-oracle",
  "frame-support",
+ "pallet-timestamp",
  "sp-api",
  "sp-runtime",
 ]

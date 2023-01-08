@@ -1,4 +1,4 @@
-use dia_oracle_runtime_api::{CoinInfo, PriceInfo};
+use dia_oracle_runtime_api::{CoinInfo, TimestampedValue, PriceInfo};
 use jsonrpsee::{
 	core::RpcResult,
 	proc_macros::rpc,
@@ -8,20 +8,22 @@ use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_core::Bytes;
 use sp_runtime::{generic::BlockId, traits::Block as BlockT};
+use pallet_timestamp::Config as TimestampConfig;
 
 pub use dia_oracle_runtime_api::DiaOracleApi as DiaOracleRuntimeApi;
+
 
 use std::sync::Arc;
 
 #[rpc(client, server)]
-pub trait DiaOracleApi<BlockHash> {
+pub trait DiaOracleApi<BlockHash, T> where T : TimestampConfig{
 	#[method(name = "dia_getCoinInfo")]
 	fn get_coin_info(
 		&self,
 		blockchain: Bytes,
 		symbol: Bytes,
 		at: Option<BlockHash>,
-	) -> RpcResult<CoinInfo>;
+	) -> RpcResult<TimestampedValue<CoinInfo, T::Moment>>;
 
 	#[method(name = "dia_getValue")]
 	fn get_value(
@@ -29,7 +31,7 @@ pub trait DiaOracleApi<BlockHash> {
 		blockchain: Bytes,
 		symbol: Bytes,
 		at: Option<BlockHash>,
-	) -> RpcResult<PriceInfo>;
+	) -> RpcResult<PriceInfo<T::Moment>>;
 }
 
 /// A struct that implements the [`DiaOracleApi`].
@@ -62,18 +64,19 @@ impl From<Error> for i32 {
 	}
 }
 
-impl<C, Block> DiaOracleApiServer<<Block as BlockT>::Hash> for DiaOracleRpc<C, Block>
+impl<C, Block, T> DiaOracleApiServer<<Block as BlockT>::Hash, T> for DiaOracleRpc<C, Block>
 where
 	Block: BlockT,
 	C: 'static + ProvideRuntimeApi<Block> + HeaderBackend<Block>,
-	C::Api: DiaOracleRuntimeApi<Block>,
+	C::Api: DiaOracleRuntimeApi<Block, T>,
+	T : TimestampConfig
 {
 	fn get_coin_info(
 		&self,
 		blockchain: Bytes,
 		symbol: Bytes,
 		at: Option<<Block as BlockT>::Hash>,
-	) -> RpcResult<CoinInfo> {
+	) -> RpcResult<TimestampedValue<CoinInfo, T::Moment>> {
 		let api = self.client.runtime_api();
 		let at = BlockId::hash(at.unwrap_or_else(||
 			// If the block hash is not supplied assume the best block.
@@ -104,7 +107,7 @@ where
 		blockchain: Bytes,
 		symbol: Bytes,
 		at: Option<<Block as BlockT>::Hash>,
-	) -> RpcResult<PriceInfo> {
+	) -> RpcResult<PriceInfo<T::Moment>> {
 		let api = self.client.runtime_api();
 		let at = BlockId::hash(at.unwrap_or_else(||
 			// If the block hash is not supplied assume the best block.
