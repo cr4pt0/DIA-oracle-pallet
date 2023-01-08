@@ -140,11 +140,11 @@ fn set_updated_coin_infos_should_work() {
 			true
 		);
 		assert_eq!(
-			<CoinInfosMap<Test>>::get(AssetId::new(vec![2, 2, 2], vec![2, 2, 2])),
+			<CoinInfosMap<Test>>::get(AssetId::new(vec![2, 2, 2], vec![2, 2, 2])).value,
 			example_info
 		);
 		assert_eq!(
-			<CoinInfosMap<Test>>::get(AssetId::new(vec![1, 2, 3], vec![1, 2, 3])),
+			<CoinInfosMap<Test>>::get(AssetId::new(vec![1, 2, 3], vec![1, 2, 3])).value,
 			CoinInfo::default()
 		);
 	})
@@ -191,7 +191,7 @@ fn get_coin_info_should_work() {
 
 		let coin_info = DOracle::get_coin_info(vec![2, 2, 2], vec![2, 2, 2]);
 
-		assert_eq!(coin_info, Ok(example_info));
+		assert_eq!(coin_info.unwrap().value, example_info);
 		assert_eq!(Ok(9), DOracle::get_value(vec![2, 2, 2], vec![2, 2, 2]).map(|x| x.value));
 	})
 }

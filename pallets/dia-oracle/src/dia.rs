@@ -1,17 +1,18 @@
 use codec::{Decode, Encode};
 use frame_support::{sp_runtime::DispatchError, sp_std::vec::Vec};
+use pallet_timestamp::Config as TimestampConfig;
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[cfg(feature = "std")]
 use serde::Serializer;
 
 // TODO: Maybe it should be moved to it's own crate
-pub trait DiaOracle {
+pub trait DiaOracle<T : TimestampConfig> {
 	/// Returns the coin info by given name
-	fn get_coin_info(blockchain: Vec<u8>, symbol: Vec<u8>) -> Result<CoinInfo, DispatchError>;
+	fn get_coin_info(blockchain: Vec<u8>, symbol: Vec<u8>) -> Result<TimestampedValue<CoinInfo, T::Moment>, DispatchError>;
 
 	/// Returns the price by given name
-	fn get_value(blockchain: Vec<u8>, symbol: Vec<u8>) -> Result<PriceInfo, DispatchError>;
+	fn get_value(blockchain: Vec<u8>, symbol: Vec<u8>) -> Result<PriceInfo<T::Moment>, DispatchError>;
 }
 
 #[derive(
@@ -39,6 +40,23 @@ pub struct CoinInfo {
 	pub price: u128,
 }
 
+#[derive(
+	Encode,
+	Decode,
+	scale_info::TypeInfo,
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	Default,
+	Deserialize,
+	Serialize,
+)]
+pub struct TimestampedValue<Value, Moment>{
+	pub value: Value,
+	pub timestamp: Moment,
+}
+
 pub fn de_string_to_bytes<'de, D>(de: D) -> Result<Vec<u8>, D::Error>
 where
 	D: Deserializer<'de>,
@@ -61,12 +79,13 @@ impl AssetId {
 
 #[derive(Eq, PartialEq, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Debug))]
-pub struct PriceInfo {
+pub struct PriceInfo<T> {
 	pub value: u128,
+	pub x : T
 }
 
 #[cfg(feature = "std")]
-impl Serialize for PriceInfo {
+impl<T : TimestampConfig> Serialize for PriceInfo<T> {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
 		S: Serializer,
@@ -76,14 +95,14 @@ impl Serialize for PriceInfo {
 }
 
 #[cfg(feature = "std")]
-impl<'de> Deserialize<'de> for PriceInfo {
+impl<'de, T : TimestampConfig + pallet_timestamp::Config<Moment = T> + std::default::Default> Deserialize<'de> for PriceInfo<T> {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
 		D: Deserializer<'de>,
 	{
 		let s = String::deserialize(deserializer)?;
 		s.parse::<u128>()
-			.map(|x| PriceInfo { value: x })
+			.map(|x| PriceInfo { value: x, x: T::Moment::default() }) //TODO T::Moment::default
 			.map_err(|_| serde::de::Error::custom("Parse from str failed"))
 	}
 }

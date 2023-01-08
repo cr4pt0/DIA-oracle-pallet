@@ -53,7 +53,8 @@ pub mod crypto {
 
 #[frame_support::pallet]
 pub mod pallet {
-	use super::*;
+
+use super::*;
 
 	use frame_support::{
 		dispatch::DispatchResult,
@@ -72,7 +73,7 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
+	pub trait Config: frame_system::Config + pallet_timestamp::Config + CreateSignedTransaction<Call<Self>> {
 		/// The overarching event type.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -108,7 +109,7 @@ pub mod pallet {
 	/// Map of all the coins names to their respective info and price
 	#[pallet::storage]
 	#[pallet::getter(fn prices_map)]
-	pub type CoinInfosMap<T> = StorageMap<_, Blake2_128Concat, AssetId, CoinInfo, ValueQuery>;
+	pub type CoinInfosMap<T: Config> = StorageMap<_, Blake2_128Concat, AssetId, TimestampedValue<CoinInfo,T::Moment>, ValueQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -205,17 +206,17 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> DiaOracle for Pallet<T> {
-		fn get_coin_info(blockchain: Vec<u8>, symbol: Vec<u8>) -> Result<CoinInfo, DispatchError> {
+	impl<T: Config> DiaOracle<T> for Pallet<T> {
+		fn get_coin_info(blockchain: Vec<u8>, symbol: Vec<u8>) -> Result<TimestampedValue<CoinInfo, T::Moment>, DispatchError> {
 			let asset_id = AssetId { blockchain, symbol };
 			ensure!(<CoinInfosMap<T>>::contains_key(&asset_id), Error::<T>::NoCoinInfoAvailable);
 			let result = <CoinInfosMap<T>>::get(&asset_id);
 			Ok(result)
 		}
 
-		fn get_value(blockchain: Vec<u8>, symbol: Vec<u8>) -> Result<PriceInfo, DispatchError> {
-			<Pallet<T> as DiaOracle>::get_coin_info(blockchain, symbol)
-				.map(|info| PriceInfo { value: info.price })
+		fn get_value(blockchain: Vec<u8>, symbol: Vec<u8>) -> Result<PriceInfo<T::Moment>, DispatchError> {
+			<Pallet<T> as DiaOracle<T>>::get_coin_info(blockchain, symbol)
+				.map(|info| PriceInfo { value: info.value.price, x : info.timestamp})
 		}
 	}
 
@@ -380,7 +381,9 @@ pub mod pallet {
 			Pallet::<T>::check_origin_rights(&origin_account_id)?;
 			Self::deposit_event(Event::<T>::UpdatedPrices(coin_infos.clone()));
 			for ((blockchain, symbol), c) in coin_infos {
-				<CoinInfosMap<T>>::insert(AssetId { blockchain, symbol }, c);
+				let timestamped =
+					TimestampedValue { timestamp: Self::get_current_time(), value: c };
+				<CoinInfosMap<T>>::insert(AssetId { blockchain, symbol }, timestamped );
 			}
 			Ok(())
 		}
@@ -393,5 +396,10 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::BatchingApiRouteSet(api));
 			Ok(())
 		}
+	}
+}
+impl<T: Config> Pallet<T> {
+	fn get_current_time() -> T::Moment {
+		<pallet_timestamp::Pallet<T>>::get()
 	}
 }

@@ -20,6 +20,7 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system,
 		DOracle: dia_oracle,
+		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 	}
 );
 
@@ -88,6 +89,17 @@ impl dia_oracle::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type AuthorityId = super::crypto::DiaAuthId;
 	type RuntimeCall = RuntimeCall;
+	type WeightInfo = ();
+}
+
+parameter_types! {
+	pub const MinimumPeriod: u64 = 5;
+}
+impl pallet_timestamp::Config for Test{
+    type Moment = u64;
+
+	type OnTimestampSet = ();
+	type MinimumPeriod = MinimumPeriod;
 	type WeightInfo = ();
 }
 
